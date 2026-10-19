@@ -28,6 +28,18 @@ jobs:
         with:
           terraform_version: "1.16.5"
 
+      - name: Terraform Format - State Bootstrap
+        working-directory: bootstrap/state
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init - State Bootstrap
+        working-directory: bootstrap/state
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate - State Bootstrap
+        working-directory: bootstrap/state
+        run: terraform validate
+
       - name: Terraform Format - Existing Configuration
         working-directory: terraform/aws
         run: terraform fmt -check -recursive
