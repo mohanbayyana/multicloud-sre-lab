@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'terraform/aws/**'
+      - 'modules/**'
+      - 'live/**'
+      - '.gitignore'
       - '.github/workflows/terraform-validate.yml'
   workflow_dispatch:
 
@@ -16,10 +19,6 @@ jobs:
   validate:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: terraform/aws
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,13 +26,46 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.16.4"
+          terraform_version: "1.16.5"
 
-      - name: Terraform Format
+      - name: Terraform Format - Existing Configuration
+        working-directory: terraform/aws
         run: terraform fmt -check -recursive
 
-      - name: Terraform Init
+      - name: Terraform Init - Existing Configuration
+        working-directory: terraform/aws
         run: terraform init -backend=false -input=false
 
-      - name: Terraform Validate
+      - name: Terraform Validate - Existing Configuration
+        working-directory: terraform/aws
         run: terraform validate
+
+      - name: Terraform Format - Networking Module
+        working-directory: modules/aws-networking
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init - Networking Module
+        working-directory: modules/aws-networking
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate - Networking Module
+        working-directory: modules/aws-networking
+        run: terraform validate
+
+      - name: Install Terragrunt
+        uses: gruntwork-io/terragrunt-action@v3
+        with:
+          tg_version: "1.1.6"
+          tf_path: terraform
+
+      - name: Terragrunt Format Check
+        working-directory: live/aws
+        run: terragrunt hcl fmt --check --diff
+
+      - name: Terragrunt HCL Validate
+        working-directory: live/aws/lab
+        run: terragrunt hcl validate
+
+      - name: Terragrunt Terraform Validate
+        working-directory: live/aws/lab
+        run: terragrunt run -- validate

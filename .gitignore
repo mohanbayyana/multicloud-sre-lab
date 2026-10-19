@@ -6,3 +6,9 @@
 *.tfplan
 crash.log
 .DS_Store
+
+# Terragrunt cache
+**/.terragrunt-cache/
+
+# Lockfile generated when validating the child module standalone
+/modules/aws-networking/.terraform.lock.hcl
