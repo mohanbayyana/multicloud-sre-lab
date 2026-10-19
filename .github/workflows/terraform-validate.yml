@@ -8,6 +8,7 @@ on:
       - 'terraform/aws/**'
       - 'modules/**'
       - 'live/**'
+      - 'bootstrap/**'
       - '.gitignore'
       - '.github/workflows/terraform-validate.yml'
   workflow_dispatch:
