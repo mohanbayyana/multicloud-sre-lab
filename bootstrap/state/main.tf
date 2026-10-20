@@ -2,6 +2,14 @@
 terraform {
   required_version = ">= 1.10.0"
 
+  backend "s3" {
+    bucket       = "multicloud-sre-lab-tfstate-888521354368-us-east-1"
+    key          = "bootstrap/state/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -9,6 +17,7 @@ terraform {
     }
   }
 }
+
 
 provider "aws" {
   region = "us-east-1"
