@@ -10,7 +10,7 @@ on:
       - 'live/**'
       - 'bootstrap/**'
       - '.gitignore'
-      - '.github/workflows/terraform-validate.yml'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
