@@ -1,0 +1,100 @@
+name: Bootstrap Terraform State Bucket
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_create:
+        description: "Choose CREATE to approve the one-time bucket creation"
+        required: true
+        type: choice
+        options:
+          - NO
+          - CREATE
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-state-bucket-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  create-state-bucket:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_create == 'CREATE'
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      STATE_BUCKET: multicloud-sre-lab-tfstate-888521354368-us-east-1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.5"
+
+      - name: Authenticate to AWS using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: GitHubStateBootstrap
+
+      - name: Verify AWS account
+        run: |
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          if [ "$account_id" != "888521354368" ]; then
+            echo "::error::Unexpected AWS account: $account_id"
+            exit 1
+          fi
+
+      - name: Check bucket does not already exist
+        run: |
+          set +e
+          aws s3api head-bucket \
+            --bucket "$STATE_BUCKET" \
+            --region "$AWS_REGION" \
+            >/tmp/head-bucket.log 2>&1
+          result=$?
+          set -e
+
+          if [ "$result" -eq 0 ]; then
+            echo "::error::Bucket already exists. This is a one-time bootstrap workflow."
+            exit 1
+          elif grep -Eq '404|Not Found|NoSuchBucket' /tmp/head-bucket.log; then
+            echo "Bucket is absent. Proceeding."
+          else
+            cat /tmp/head-bucket.log
+            echo "::error::Could not verify bucket absence."
+            exit 1
+          fi
+
+      - name: Terraform Format Check
+        run: terraform -chdir=bootstrap/state fmt -check -recursive
+
+      - name: Initialize without remote backend
+        run: terraform -chdir=bootstrap/state init -backend=false -input=false
+
+      - name: Create and review plan
+        run: |
+          terraform -chdir=bootstrap/state plan \
+            -input=false -out=tfplan
+          terraform -chdir=bootstrap/state show -no-color tfplan
+
+      - name: Apply approved workflow plan
+        run: terraform -chdir=bootstrap/state apply -input=false -auto-approve tfplan
+
+      - name: Migrate bootstrap state to S3
+        run: terraform -chdir=bootstrap/state init -migrate-state -force-copy -input=false
+
+      - name: Verify remote state
+        run: |
+          terraform -chdir=bootstrap/state state list
+          aws s3api head-object \
+            --bucket "$STATE_BUCKET" \
+            --key bootstrap/state/terraform.tfstate \
+            --region "$AWS_REGION"
